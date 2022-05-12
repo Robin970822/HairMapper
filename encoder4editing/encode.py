@@ -52,7 +52,7 @@ def run():
       code_path =os.path.join(code_dir,f'{name}.npy')
       if os.path.exists(code_path):
           continue
-      input_image = PIL.Image.open(file_path)
+      input_image = PIL.Image.open(file_path).convert('RGB')
       transformed_image = img_transforms(input_image)
       with torch.no_grad():
         latents = run_on_batch(transformed_image.unsqueeze(0), net)

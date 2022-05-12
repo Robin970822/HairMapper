@@ -11,6 +11,7 @@ from diffuse.inverter_remove_hair import InverterRemoveHair
 import numpy as np
 from PIL import ImageFile
 import os
+
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
@@ -76,8 +77,12 @@ def run():
     code_dir = os.path.join(args.data_dir, 'code')
     origin_img_dir = os.path.join(args.data_dir, 'origin')
     res_dir = os.path.join(args.data_dir, 'mapper_res')
+    edit_dir = os.path.join(args.data_dir, 'mapper_edit')
+    hair_mask_dir = os.path.join(args.data_dir, 'hair_mask')
 
     mkdir(res_dir)
+    mkdir(edit_dir)
+    mkdir(hair_mask_dir)
 
     code_list = glob.glob(os.path.join(code_dir, '*.npy'))
 
@@ -91,7 +96,7 @@ def run():
         name = os.path.basename(code_path)[:-4]
         f_path_png = os.path.join(origin_img_dir, f'{name}.png')
         f_path_jpg = os.path.join(origin_img_dir, f'{name}.jpg')
-        if os.path.exists(os.path.join(res_dir, f'{name}.png')):
+        if os.path.exists(os.path.join(res_dir, f'mix_{name}.png')):
             continue
         if os.path.exists(f_path_png):
             origin_img_path = f_path_png
@@ -117,6 +122,8 @@ def run():
                                           )
 
         edited_img = outputs['image'][0][:, :, ::-1]
+        res_save_path = os.path.join(edit_dir, f'edit_{name}.png')
+        cv2.imwrite(res_save_path, edited_img)
 
         # --remain_ear: preserve the ears in the original input image.
         if args.remain_ear:
@@ -130,13 +137,19 @@ def run():
         mask_dilate_blur = (hair_mask + (255 - hair_mask) / 255 * mask_dilate_blur).astype(np.uint8)
 
         face_mask = 255 - mask_dilate_blur
+        hair_mask_path = os.path.join(hair_mask_dir, f'hair_{name}.png')
+        face_mask_path = os.path.join(hair_mask_dir, f'face_{name}.png')
+        cv2.imwrite(hair_mask_path, hair_mask)
+        cv2.imwrite(face_mask_path, face_mask)
 
         index = np.where(face_mask > 0)
         cy = (np.min(index[0]) + np.max(index[0])) // 2
         cx = (np.min(index[1]) + np.max(index[1])) // 2
         center = (cx, cy)
 
-        res_save_path = os.path.join(res_dir, f'{name}.png')
+        res_save_path = os.path.join(res_dir, f'mix_{name}.png')
+        image_height, image_width = origin_img.shape[:2]
+        edited_img = cv2.resize(edited_img, (image_width, image_height), interpolation=cv2.INTER_CUBIC)
 
         if args.diffuse:
             synthesis_image = origin_img * (1 - hair_mask // 255) + edited_img * (hair_mask // 255)
@@ -150,8 +163,10 @@ def run():
             mixed_clone = cv2.seamlessClone(origin_img, res_img[:, :, ::-1], face_mask[:, :, 0], center,
                                             cv2.NORMAL_CLONE)
         else:
-
-            mixed_clone = cv2.seamlessClone(origin_img, edited_img, face_mask[:, :, 0], center, cv2.NORMAL_CLONE)
+            try:
+                mixed_clone = cv2.seamlessClone(origin_img, edited_img, face_mask[:, :, 0], center, cv2.NORMAL_CLONE)
+            except:
+                mixed_clone = edited_img
         cv2.imwrite(res_save_path, mixed_clone)
 
 
