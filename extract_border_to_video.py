@@ -1,9 +1,20 @@
 import cv2
 import glob
 import os
+import argparse
 
 from tqdm import tqdm
 from classifier.src.feature_extractor.hair_mask_extractor import get_app_mask, get_parsingNet
+
+
+def parse_args():
+    """Parses arguments."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--data_dir', type=str, default='./test_data',
+                        help='Directory of test data.')
+    parser.add_argument('--out_video', type=str, default='./test_data/head_border.mp4',
+                        help='Directory of test data.')
+    return parser.parse_args()
 
 
 def mkdir(path):
@@ -28,21 +39,27 @@ def draw_contour_with_mask(img, mask, color=(0, 0, 255), line_width=5):
 
 
 if __name__ == '__main__':
-
+    args = parse_args()
     parsingNet = get_parsingNet(save_pth='./ckpts/face_parsing.pth')
 
-    data_root = './test_data'
+    data_root = args.data_dir
     code_dir = os.path.join(data_root, 'code')
     edit_dir = os.path.join(data_root, 'mapper_edit')
 
     face_dir = os.path.join(data_root, 'parsing_face')
+    border_dir = os.path.join(data_root, 'head_border')
     face_mask_dir = os.path.join(data_root, 'parsing_face_mask')
 
     mkdir(face_dir)
     mkdir(face_mask_dir)
+    mkdir(border_dir)
 
     code_list = glob.glob(os.path.join(code_dir, '*.npy'))
+    code_list = sorted(code_list, key=lambda x: int(os.path.basename(x).split('_')[1]))
     total_num = len(code_list)
+
+    writer = cv2.VideoWriter(args.out_video, cv2.VideoWriter_fourcc("D", "I", "V", "X"), 15,
+                             (1024, 1024))
 
     for index in tqdm(list(range(total_num))):
         code_path = code_list[index]
@@ -64,5 +81,7 @@ if __name__ == '__main__':
         c_origin_img = draw_contour_with_mask(origin_img, mask)
 
         cv2.imwrite(os.path.join(face_dir, 'c_{}.png'.format(name)), c_edit_img)
-        cv2.imwrite(os.path.join(face_dir, 'o_{}.png'.format(name)), c_origin_img)
+        cv2.imwrite(os.path.join(border_dir, 'b_{}.png'.format(name)), c_origin_img)
         cv2.imwrite(os.path.join(face_mask_dir, 'm_{}.png'.format(name)), mask)
+        writer.write(c_origin_img)
+    writer.release()
