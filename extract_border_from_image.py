@@ -157,7 +157,6 @@ def run():
 
         origin_img = cv2.imread(file_path)
         contours = extract_head_border_from_image(origin_img, encode_net, gan_model, mapper, alpha, parsingNet)
-        print(contours)
         if args.store_image:
             c_img = origin_img.copy()
             c_img = cv2.drawContours(c_img, contours, -1, (0, 0, 255), 5)

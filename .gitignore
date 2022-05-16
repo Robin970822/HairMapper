@@ -1,0 +1,4 @@
+*.pyc
+*.pth
+ckpts
+test_data
