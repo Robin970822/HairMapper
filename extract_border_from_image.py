@@ -16,7 +16,6 @@ sys.path.append("")
 from encoder4editing.models.psp import pSp
 from styleGAN2_ada_model.stylegan2_ada_generator import StyleGAN2adaGenerator
 from mapper.networks.level_mapper import LevelMapper
-from diffuse.inverter_remove_hair import InverterRemoveHair
 from classifier.src.feature_extractor.hair_mask_extractor import get_hair_mask, get_app_mask, get_parsingNet
 
 

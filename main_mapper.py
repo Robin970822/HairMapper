@@ -165,6 +165,8 @@ def run():
         else:
             try:
                 mixed_clone = cv2.seamlessClone(origin_img, edited_img, face_mask[:, :, 0], center, cv2.NORMAL_CLONE)
+                # mask = (hair_mask / 255).astype('uint8')
+                # mixed_clone = origin_img * (1 - mask) + edited_img * mask
             except:
                 mixed_clone = edited_img
         cv2.imwrite(res_save_path, mixed_clone)
