@@ -98,7 +98,7 @@ def extract_head_border_from_image(origin_img, encode_net, model, mapper, alpha,
     face_mask, _, hair_mask = get_app_mask(img_path=edited_img, net=parsingNet, include_hat=True, include_ear=True)
     mask = face_mask + hair_mask
     contours, _ = cv2.findContours(mask[:, :, 0], cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    return contours
+    return contours, edited_img, face_mask, hair_mask
 
 
 def mix_images(origin_img, edited_img, parsingNet):
