@@ -7,12 +7,12 @@ import argparse
 import numpy as np
 import torchvision.transforms as transforms
 
-from PIL import Image
 from tqdm import tqdm
 from argparse import Namespace
 
 sys.path.append("encoder4editing")
 sys.path.append("")
+from mapper_utils import unpack_bz2, convert_cv2pil, convert_pil2cv
 from encoder4editing.models.psp import pSp
 from styleGAN2_ada_model.stylegan2_ada_generator import StyleGAN2adaGenerator
 from mapper.networks.level_mapper import LevelMapper
@@ -53,9 +53,15 @@ def parse_args():
     return parser.parse_args()
 
 
-def mkdir(path):
+def ensure_dir(path):
     if not os.path.exists(path):
-        os.mkdir(path)
+        os.makedirs(path)
+
+
+def ensure_sub_dir(path):
+    dir_path = os.path.dirname(path)
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
 
 
 def run_on_batch(inputs, net):
@@ -65,7 +71,6 @@ def run_on_batch(inputs, net):
 
 def encode_image(input_image, net):
     input_image = input_image.copy()
-    input_image = Image.fromarray(cv2.cvtColor(input_image, cv2.COLOR_BGR2RGB))
     img_transforms = transforms.Compose([
         transforms.Resize((256, 256)),
         transforms.ToTensor(),
@@ -148,13 +153,14 @@ def run():
     origin_img_dir = os.path.join(args.data_dir, 'origin')
     if args.store_image:
         border_dir = os.path.join(args.data_dir, 'head_border')
-        mkdir(border_dir)
+        ensure_dir(border_dir)
 
     for file_path in tqdm(glob.glob(os.path.join(origin_img_dir, '*.png')) + glob.glob(
             os.path.join(origin_img_dir, '*.jpg'))):
         name = os.path.basename(file_path)[:-4]
 
         origin_img = cv2.imread(file_path)
+        origin_img = convert_cv2pil(origin_img)
         contours = extract_head_border_from_image(origin_img, encode_net, gan_model, mapper, alpha, parsingNet)
         if args.store_image:
             c_img = origin_img.copy()
