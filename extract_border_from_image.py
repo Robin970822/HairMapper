@@ -88,7 +88,7 @@ def extract_head_border_from_image(origin_img, encode_net, model, mapper, alpha,
     if isinstance(origin_img, np.ndarray):
         origin_img = convert_cv2pil(origin_img)
     if flip:
-        origin_img.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+        origin_img = origin_img.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
     # latent code
     latent = encode_image(origin_img, encode_net)
     # editing latent code
