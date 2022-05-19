@@ -6,6 +6,7 @@ import torch
 import argparse
 
 import numpy as np
+from PIL import Image
 from tqdm import tqdm
 from argparse import Namespace
 from tensorflow.keras.utils import get_file
@@ -35,6 +36,7 @@ def parse_args():
     parser.add_argument("--store_image",
                         help="if set, store the edited images",
                         action="store_true")
+    parser.add_argument('--flip', action="store_true")
     return parser.parse_args()
 
 
@@ -43,6 +45,7 @@ if __name__ == '__main__':
     video_path = args.video_path
     orientation = args.orientation
     store_image = args.store_image
+    flip = args.flip
     # landmarks_detector
     landmarks_model_path = unpack_bz2(get_file('shape_predictor_68_face_landmarks.dat.bz2',
                                                LANDMARKS_MODEL_URL, cache_subdir='temp'))
@@ -125,22 +128,37 @@ if __name__ == '__main__':
             aligned_face_path = os.path.join(aligned_img_dir, aligned_img_name)
             aligned_img, affine_mat = image_align(convert_cv2pil(img), aligned_face_path, face_landmarks,
                                                   store_image=store_image)
+            inverse_affine_mat = cv2.invertAffineTransform(affine_mat)
             try:
                 contours, edited_img, face_mask, hair_mask = extract_head_border_from_image(aligned_img, encode_net,
                                                                                             gan_model, mapper, alpha,
                                                                                             parsingNet)
-                inverse_affine_mat = cv2.invertAffineTransform(affine_mat)
                 if store_image:
                     crop_img = convert_pil2cv(aligned_img)
                     crop_img = cv2.drawContours(crop_img, contours, -1, (0, 0, 255), 5)
                 contours = warpaffine_contours(contours, inverse_affine_mat)
                 contour_img = cv2.drawContours(contour_img, contours, -1, (0, 0, 255), 5)
-
                 if store_image:
                     list(map(lambda x, y, z: cv2.imwrite(os.path.join(x, y + face_img_name), z),
                              [crop_out_path, edit_out_path, mask_out_path, mask_out_path],
                              ['crop_', 'edit_', 'face_', 'hair_'],
                              [crop_img, edited_img, face_mask, hair_mask]))
+                if flip:
+                    fliped_aligned_img = aligned_img.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+                    contours, edited_img, face_mask, hair_mask = extract_head_border_from_image(fliped_aligned_img,
+                                                                                                encode_net,
+                                                                                                gan_model, mapper,
+                                                                                                alpha,
+                                                                                                parsingNet, flip=flip)
+                    if store_image:
+                        crop_img = cv2.drawContours(crop_img, contours, -1, (255, 0, 0), 5)
+                    contours = warpaffine_contours(contours, inverse_affine_mat)
+                    contour_img = cv2.drawContours(contour_img, contours, -1, (255, 0, 0), 5)
+                    if store_image:
+                        list(map(lambda x, y, z: cv2.imwrite(os.path.join(x, y + face_img_name), z),
+                                 [crop_out_path, edit_out_path, mask_out_path, mask_out_path],
+                                 ['flip_crop_', 'flip_edit_', 'flip_face_', 'flip_hair_'],
+                                 [crop_img, edited_img, face_mask, hair_mask]))
             except:
                 print('cannot extract contours')
                 continue

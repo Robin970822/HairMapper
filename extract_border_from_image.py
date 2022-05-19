@@ -12,7 +12,7 @@ from argparse import Namespace
 
 sys.path.append("encoder4editing")
 sys.path.append("")
-from mapper_utils import unpack_bz2, convert_cv2pil, convert_pil2cv
+from mapper_utils import convert_cv2pil
 from encoder4editing.models.psp import pSp
 from styleGAN2_ada_model.stylegan2_ada_generator import StyleGAN2adaGenerator
 from mapper.networks.level_mapper import LevelMapper
@@ -83,7 +83,9 @@ def encode_image(input_image, net):
         return latent
 
 
-def extract_head_border_from_image(origin_img, encode_net, model, mapper, alpha, parsingNet):
+def extract_head_border_from_image(origin_img, encode_net, model, mapper, alpha, parsingNet, flip=False):
+    if isinstance(origin_img, np.ndarray):
+        origin_img = convert_cv2pil(origin_img)
     # latent code
     latent = encode_image(origin_img, encode_net)
     # editing latent code
@@ -102,6 +104,9 @@ def extract_head_border_from_image(origin_img, encode_net, model, mapper, alpha,
     # extract head border
     face_mask, _, hair_mask = get_app_mask(img_path=edited_img, net=parsingNet, include_hat=True, include_ear=True)
     mask = face_mask + hair_mask
+    if flip:
+        [mask, edited_img, face_mask, hair_mask] = list(
+            map(lambda x: cv2.flip(x, 1), [mask, edited_img, face_mask, hair_mask]))
     contours, _ = cv2.findContours(mask[:, :, 0], cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     return contours, edited_img, face_mask, hair_mask
 
