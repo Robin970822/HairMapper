@@ -9,6 +9,7 @@ import torchvision.transforms as transforms
 
 from tqdm import tqdm
 from argparse import Namespace
+from PIL import Image
 
 sys.path.append("encoder4editing")
 sys.path.append("")
@@ -86,6 +87,8 @@ def encode_image(input_image, net):
 def extract_head_border_from_image(origin_img, encode_net, model, mapper, alpha, parsingNet, flip=False):
     if isinstance(origin_img, np.ndarray):
         origin_img = convert_cv2pil(origin_img)
+    if flip:
+        origin_img.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
     # latent code
     latent = encode_image(origin_img, encode_net)
     # editing latent code

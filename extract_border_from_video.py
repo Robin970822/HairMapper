@@ -6,7 +6,6 @@ import torch
 import argparse
 
 import numpy as np
-from PIL import Image
 from tqdm import tqdm
 from argparse import Namespace
 from tensorflow.keras.utils import get_file
@@ -144,9 +143,7 @@ if __name__ == '__main__':
                              ['crop_', 'edit_', 'face_', 'hair_'],
                              [crop_img, edited_img, face_mask, hair_mask]))
                 if flip:
-                    fliped_aligned_img = aligned_img.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
-                    contours, edited_img, face_mask, hair_mask = extract_head_border_from_image(fliped_aligned_img,
-                                                                                                encode_net,
+                    contours, edited_img, face_mask, hair_mask = extract_head_border_from_image(aligned_img, encode_net,
                                                                                                 gan_model, mapper,
                                                                                                 alpha,
                                                                                                 parsingNet, flip=flip)
