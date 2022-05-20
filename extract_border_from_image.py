@@ -65,6 +65,25 @@ def ensure_sub_dir(path):
         os.makedirs(dir_path)
 
 
+def load_models():
+    ## head border
+    encode_model_path = "./HairMapper/ckpts/e4e_ffhq_encode.pt"
+    ckpt = torch.load(encode_model_path, map_location='cpu')
+    opts = ckpt['opts']
+    opts['checkpoint_path'] = encode_model_path
+    opts = Namespace(**opts)
+    encode_net = pSp(opts).eval().cuda()
+
+    model_name = 'stylegan2_ada'
+    gan_model = StyleGAN2adaGenerator(model_name, logger=None, truncation_psi=0.75)
+    mapper = LevelMapper(input_dim=512).eval().cuda()
+    ckpt = torch.load('./HairMapper/mapper/checkpoints/final/best_model.pt')
+    alpha = float(ckpt['alpha']) * 1.2
+    mapper.load_state_dict(ckpt['state_dict'], strict=True)
+    parsingNet = get_parsingNet(save_pth='./HairMapper/ckpts/face_parsing.pth')
+    return encode_net, gan_model, mapper, alpha, parsingNet
+
+
 def run_on_batch(inputs, net):
     latents = net(inputs.to("cuda").float(), randomize_noise=False, return_latents=True)
     return latents
@@ -84,13 +103,7 @@ def encode_image(input_image, net):
         return latent
 
 
-def extract_head_border_from_image(origin_img, encode_net, model, mapper, alpha, parsingNet, flip=False):
-    if isinstance(origin_img, np.ndarray):
-        origin_img = convert_cv2pil(origin_img)
-    if flip:
-        origin_img = origin_img.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
-    # latent code
-    latent = encode_image(origin_img, encode_net)
+def edit_image(latent, model, mapper, alpha):
     # editing latent code
     mapper_input = latent.copy()
     mapper_input_tensor = torch.from_numpy(mapper_input).cuda().float()
@@ -104,14 +117,7 @@ def extract_head_border_from_image(origin_img, encode_net, model, mapper, alpha,
                                       latent_space_type='wp'
                                       )
     edited_img = outputs['image'][0][:, :, ::-1]
-    # extract head border
-    face_mask, _, hair_mask = get_app_mask(img_path=edited_img, net=parsingNet, include_hat=True, include_ear=True)
-    mask = face_mask + hair_mask
-    if flip:
-        [mask, edited_img, face_mask, hair_mask] = list(
-            map(lambda x: cv2.flip(x, 1), [mask, edited_img, face_mask, hair_mask]))
-    contours, _ = cv2.findContours(mask[:, :, 0], cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    return contours, edited_img, face_mask, hair_mask
+    return edited_img
 
 
 def mix_images(origin_img, edited_img, parsingNet):
@@ -137,6 +143,35 @@ def mix_images(origin_img, edited_img, parsingNet):
         mask = (hair_mask / 255).astype('uint8')
         mixed_clone = origin_img * (1 - mask) + edited_img * mask
     return mixed_clone, hair_mask, face_mask
+
+
+def extract_head_border_from_image(origin_img, encode_net, model, mapper, alpha, segmentors, flip=False, mix=False):
+    if isinstance(origin_img, np.ndarray):
+        origin_img = convert_cv2pil(origin_img)
+    if flip:
+        origin_img = origin_img.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+    # latent code
+    latent = encode_image(origin_img, encode_net)
+    # editing image
+    edited_img = edit_image(latent, model, mapper, alpha)
+    # extract head border
+    if mix:
+        edited_img = mix_images(origin_img, edited_img, segmentors)
+    if isinstance(segmentors, dict):
+        face_segmentor = segmentors['face_segmentor']
+        hair_segmentor = segmentors['hair']
+        face_mask = face_segmentor.segment(edited_img)
+        hair_mask = hair_segmentor.segment(edited_img)
+        mask = np.bitwise_or(face_mask, hair_mask).astype('uint8')
+    else:
+        face_mask, _, hair_mask = get_app_mask(img_path=edited_img, net=segmentors, include_hat=True, include_ear=True)
+        mask = face_mask + hair_mask
+        mask = mask[:, :, 0]
+    if flip:
+        [mask, edited_img, face_mask, hair_mask] = list(
+            map(lambda x: cv2.flip(x, 1), [mask, edited_img, face_mask, hair_mask]))
+    contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    return contours, edited_img, face_mask, hair_mask
 
 
 def run():
