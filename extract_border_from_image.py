@@ -13,7 +13,7 @@ from PIL import Image
 
 sys.path.append("encoder4editing")
 sys.path.append("")
-from mapper_utils import convert_cv2pil
+from mapper_utils import convert_cv2pil, convert_pil2cv
 from encoder4editing.models.psp import pSp
 from styleGAN2_ada_model.stylegan2_ada_generator import StyleGAN2adaGenerator
 from mapper.networks.level_mapper import LevelMapper
@@ -126,6 +126,8 @@ def mix_images(origin_img, edited_img, segmentors):
         img = origin_img.copy()
         hair_segmentor = segmentors['hair_segmentor']
         hair_mask = hair_segmentor.segment(img) * 255
+        hair_mask = hair_mask[:, :, np.newaxis]
+        hair_mask = np.concatenate([hair_mask, hair_mask, hair_mask], 2)
     else:
         hair_mask = get_hair_mask(img_path=origin_img, net=segmentors, include_hat=True, include_ear=True)
 
@@ -161,7 +163,7 @@ def extract_head_border_from_image(origin_img, encode_net, model, mapper, alpha,
     edited_img = edit_image(latent, model, mapper, alpha)
     # extract head border
     if mix:
-        edited_img = mix_images(origin_img, edited_img, segmentors)
+        edited_img, _, __ = mix_images(convert_pil2cv(origin_img), edited_img, segmentors)
     if isinstance(segmentors, dict):
         # amazing
         img = edited_img.copy()
@@ -169,7 +171,7 @@ def extract_head_border_from_image(origin_img, encode_net, model, mapper, alpha,
         hair_segmentor = segmentors['hair_segmentor']
         face_mask = face_segmentor.segment(img) * 255
         hair_mask = hair_segmentor.segment(img) * 255
-        # mask = np.bitwise_or(face_mask, hair_mask).astype('uint8')
+        mask = np.bitwise_or(face_mask, hair_mask).astype('uint8')
         mask = face_mask.astype('uint8')
     else:
         face_mask, _, hair_mask = get_app_mask(img_path=edited_img, net=segmentors, include_hat=True, include_ear=True)
