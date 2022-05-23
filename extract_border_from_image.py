@@ -120,9 +120,15 @@ def edit_image(latent, model, mapper, alpha):
     return edited_img
 
 
-def mix_images(origin_img, edited_img, parsingNet):
+def mix_images(origin_img, edited_img, segmentors):
     # --remain_ear: preserve the ears in the original input image.
-    hair_mask = get_hair_mask(img_path=origin_img, net=parsingNet, include_hat=True, include_ear=True)
+    if isinstance(segmentors, dict):
+        img = origin_img.copy()
+        hair_segmentor = segmentors['hair_segmentor']
+        hair_mask = hair_segmentor.segment(img)
+        hair_mask *= 255
+    else:
+        hair_mask = get_hair_mask(img_path=origin_img, net=segmentors, include_hat=True, include_ear=True)
 
     mask_dilate = cv2.dilate(hair_mask, kernel=np.ones((50, 50), np.uint8))
     mask_dilate_blur = cv2.blur(mask_dilate, ksize=(10, 10))
@@ -158,11 +164,14 @@ def extract_head_border_from_image(origin_img, encode_net, model, mapper, alpha,
     if mix:
         edited_img = mix_images(origin_img, edited_img, segmentors)
     if isinstance(segmentors, dict):
+        # amazing
+        img = edited_img.copy()
         face_segmentor = segmentors['face_segmentor']
-        hair_segmentor = segmentors['hair']
-        face_mask = face_segmentor.segment(edited_img)
-        hair_mask = hair_segmentor.segment(edited_img)
-        mask = np.bitwise_or(face_mask, hair_mask).astype('uint8')
+        # hair_segmentor = segmentors['hair_segmentor']
+        face_mask = face_segmentor.segment(img) * 255
+        # hair_mask = hair_segmentor.segment(img)
+        # mask = np.bitwise_or(face_mask, hair_mask).astype('uint8')
+        mask = face_mask.astype('uint8')
     else:
         face_mask, _, hair_mask = get_app_mask(img_path=edited_img, net=segmentors, include_hat=True, include_ear=True)
         mask = face_mask + hair_mask
